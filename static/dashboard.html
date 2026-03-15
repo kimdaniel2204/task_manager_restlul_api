@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Мои задачи</h1>
+
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <input type="text" id="task-title" class="form-control" placeholder="Что нужно сделать?">
+                    </div>
+                    <div class="col-md-2">
+                        <select id="task-priority" class="form-select">
+                            <option value="low">Низкий</option>
+                            <option value="medium" selected>Средний</option>
+                            <option value="high">Высокий</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button onclick="createTask()" class="btn btn-primary w-100">Добавить</button>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="datetime-local" id="task-deadline" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Задача</th>
+                            <th>Приоритет</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-list">
+                        </tbody>
+                </table>
+                        <div class="d-flex justify-content-end mt-3">
+                    <button onclick="exportCSV()" class="btn btn-info btn-sm text-white shadow-sm">
+                        Скачать задачи в CSV
+                    </button>
+            </div>           
+            </div>          
+        </div>      
+    </div>
+
+    <script>
+            const API_URL = "http://127.0.0.1:8000";
+            const WS_URL = "ws://127.0.0.1:8000/ws";
+            const TOKEN = localStorage.getItem('access_token');
+
+            // Проверка авторизации
+            if (!TOKEN) {
+                window.location.href = '/login';
+            }
+
+            // 1. WebSocket с авто-реконнектом
+            let socket;
+
+            function connectWS() {
+                socket = new WebSocket(WS_URL);
+
+                socket.onopen = () => console.log("WebSocket подключен");
+                
+                socket.onmessage = (event) => {
+                    console.log("Обновление через WS:", event.data);
+                    loadTasks(); 
+                };
+
+                socket.onclose = () => {
+                    console.log("WebSocket отключен. Реконнект через 2 сек...");
+                    setTimeout(connectWS, 2000);
+                };
+
+                socket.onerror = (err) => {
+                    console.error("Ошибка WS:", err);
+                    socket.close();
+                };
+            }
+
+            // 2. Получение списка задач
+            async function loadTasks() {
+                try {
+                    const res = await fetch(`${API_URL}/tasks/`, {
+                        headers: { "Authorization": `Bearer ${TOKEN}` }
+                    });
+                    
+                    if (res.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    const tasks = await res.json();
+                    const tbody = document.getElementById('task-list');
+                    tbody.innerHTML = '';
+
+                    tasks.forEach(task => {
+                        // Форматируем дату дедлайна, если она есть
+                        const deadlineDate = task.deadline ? new Date(task.deadline).toLocaleString() : '-';
+                        
+                        const row = `
+                            <tr>
+                                <td>${task.id}</td>
+                                <td>${task.title}</td>
+                                <td><span class="badge bg-secondary">${task.priority}</span></td>
+                                <td>
+                                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-warning'}">
+                                        ${task.status}
+                                    </span>
+                                    <br><small class="text-muted">До: ${deadlineDate}</small>
+                                </td>
+                                <td>
+                                    <button onclick="completeTask(${task.id})" class="btn btn-sm btn-success">✅</button>
+                                    <button onclick="editTask(${task.id}, '${task.title}')" class="btn btn-sm btn-outline-warning">Изменить</button>
+                                    <button onclick="deleteTask(${task.id})" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                } catch (e) { 
+                    console.error("Ошибка загрузки:", e); 
+                }
+            }
+
+            // 3. Создание задачи
+            async function createTask() {
+                const title = document.getElementById('task-title').value;
+                const priority = document.getElementById('task-priority').value;
+                const deadline = document.getElementById('task-deadline').value;
+
+                if (!title) return alert("Введите название!");
+
+                await fetch(`${API_URL}/tasks/`, {
+                    method: "POST",
+                    headers: { 
+                        "Authorization": `Bearer ${TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ 
+                        title: title, 
+                        priority: priority,
+                        deadline: deadline || null 
+                    })
+                });
+                
+                document.getElementById('task-title').value = '';
+                document.getElementById('task-deadline').value = '';
+                loadTasks();
+            }
+
+            // 4. Изменение названия
+            async function editTask(id, oldTitle) {
+                const newTitle = prompt("Изменить название задачи:", oldTitle);
+                if (newTitle === null || newTitle.trim() === "") return;
+
+                await fetch(`${API_URL}/tasks/${id}`, {
+                    method: "PATCH",
+                    headers: { 
+                        "Authorization": `Bearer ${TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                loadTasks();
+            }
+
+            // 5. Выполнение задачи
+            async function completeTask(id) {
+                await fetch(`${API_URL}/tasks/${id}`, {
+                    method: "PATCH",
+                    headers: { 
+                        "Authorization": `Bearer ${TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ status: "completed" }) 
+                });
+                loadTasks();
+            }
+
+            // 6. Удаление задачи
+            async function deleteTask(id) {
+                if (!confirm("Удалить задачу?")) return;
+                await fetch(`${API_URL}/tasks/${id}`, {
+                    method: "DELETE",
+                    headers: { "Authorization": `Bearer ${TOKEN}` }
+                });
+                loadTasks();
+            }
+
+            async function exportCSV() {
+                try {
+                    const response = await fetch(`${API_URL}/tasks/export/csv`, {
+                        method: "GET",
+                        headers: { 
+                            "Authorization":` Bearer ${TOKEN}` 
+                        }
+                    });
+
+                    if (!response.ok) throw new Error("Ошибка при выгрузке");
+
+                    // Превращаем ответ в "blob" (бинарный объект)
+                    const blob = await response.blob();
+                    
+                    // Создаем временную ссылку для скачивания
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `tasks_export_${new Date().toISOString().slice(0,10)}.csv`;
+                    
+                    // Имитируем клик по ссылке
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Подметаем за собой
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    
+                } catch (e) {
+                    console.error(e);
+                    alert("Не удалось скачать CSV. Проверь консоль.");
+                }
+            }
+
+            // Инициализация
+        connectWS();
+        loadTasks();
+    </script>
+
+</body>
+</html>

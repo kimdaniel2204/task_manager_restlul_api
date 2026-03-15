@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
 from src.database import Base
 
+# Модель пользователя. Содержит email, хеш пароля и связь с задачами, которыми владеет пользователь.
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)

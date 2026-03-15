@@ -11,6 +11,8 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./test_db.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Фикстура для настройки тестовой базы данных. 
+# Создает все таблицы перед тестами и удаляет их после завершения тестов.
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     """Создает таблицы перед тестами и удаляет после"""
@@ -18,6 +20,8 @@ def setup_database():
     yield
     Base.metadata.drop_all(bind=engine)
 
+# Фикстура для получения сессии базы данных. 
+# Открывает транзакцию перед тестом и откатывает ее после, чтобы обеспечить чистое состояние БД для каждого теста.
 @pytest.fixture
 def db_session():
     """Фикстура для работы с БД в тестах"""
@@ -30,6 +34,7 @@ def db_session():
     connection.close()
     autouse=False
 
+# Фикстура для клиента FastAPI, которая подменяет реальную базу данных на тестовую.
 @pytest.fixture
 def client(db_session):
     """Фикстура клиента, которая подменяет реальную БД на тестовую"""

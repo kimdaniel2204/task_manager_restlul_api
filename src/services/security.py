@@ -1,17 +1,15 @@
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-
+from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.models.user import User
+from src.config import settings
 
-SECRET_KEY = "SUPER_SECRET_KEY_123"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -32,29 +30,25 @@ def verify_password(
     plain_password: str,
     hashed_password: str
 ) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
-    return pwd_context.verify(
-        plain_password,
-        hashed_password
-    )
-
-
+# Функция для создания JWT токена
 def create_access_token(data: dict) -> str:
-
     to_encode = data.copy()
 
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     to_encode.update({"exp": expire})
 
     return jwt.encode(
         to_encode,
-        SECRET_KEY,
+        settings.SECRET_KEY,
         algorithm=ALGORITHM
     )
 
+# Функция для получения текущего пользователя из JWT токена
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -70,12 +64,11 @@ def get_current_user(
 
         payload = jwt.decode(
             token,
-            SECRET_KEY,
+            settings.SECRET_KEY,
             algorithms=[ALGORITHM]
         )
 
         email: str = payload.get("sub")
-
         if email is None:
             raise credentials_exception
 

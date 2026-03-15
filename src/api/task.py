@@ -11,14 +11,18 @@ from src.services.security import get_current_user
 from src.services.websocket_manager import manager
 from src.services.telegram_service import TelegramService 
 
+
+# Роуты для работы с задачами
 router = APIRouter(
     prefix="/tasks",
     tags=["Tasks"]
 )
 
-# Выносим создание экземпляра сюда, чтобы не плодить импорты внутри функций
 tg_service = TelegramService()
 
+
+# Роут для получения списка задач. 
+# Поддерживает фильтрацию по статусу и приоритету. Возвращает только задачи текущего пользователя.
 @router.get("/", response_model=List[TaskOut])
 
 def get_tasks(
@@ -30,6 +34,7 @@ def get_tasks(
     task_service = TaskService(db)
     return task_service.get_tasks(current_user.id, status, priority)
 
+# Роут для экспорта задач в CSV. Возвращает файл с задачами текущего пользователя в виде CSV.
 @router.get("/export/csv")
 
 def export_tasks(
@@ -44,6 +49,7 @@ def export_tasks(
         headers={"Content-Disposition": "attachment; filename=my_tasks.csv"}
     )
 
+# Роут для создания новой задачи. Принимает данные задачи, создает ее в БД и возвращает созданную задачу.
 @router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 
 async def create_task(
@@ -55,12 +61,13 @@ async def create_task(
     task_service = TaskService(db)
     new_task = task_service.create_task(task, current_user.id)
     
-    msg = f"New Task Created:\nTitle: {new_task.title}\nPriority: {new_task.priority.value}"
+    msg = f"Новая задача создана:\nНазвание: {new_task.title}\nПриоритет: {new_task.priority.value}"
     background_tasks.add_task(tg_service.send_notification, msg)
     await manager.broadcast(f"Новая задача создана: {new_task.title}")
     
     return new_task
 
+# Роут для обновления задачи. Принимает ID задачи и данные для обновления, изменяет задачу в БД и возвращает обновленную задачу.
 @router.patch("/{task_id}", response_model=TaskOut)
 
 async def update_task(
@@ -79,6 +86,7 @@ async def update_task(
 
     return updated_task # Возвращаем уже обновленный объект
 
+# Роут для удаления задачи. Принимает ID задачи, удаляет ее из БД и возвращает сообщение об успешном удалении.
 @router.delete("/{task_id}")
 
 async def delete_task(
@@ -95,4 +103,4 @@ async def delete_task(
     background_tasks.add_task(tg_service.send_notification, msg)
     await manager.broadcast(f"Задача удалена: {task_id}")
 
-    return result # Здесь вернется {"message": "Task deleted"}
+    return result
