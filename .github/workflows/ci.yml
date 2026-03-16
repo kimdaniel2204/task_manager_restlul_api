@@ -29,7 +29,7 @@ jobs:
           SECRET_KEY: test_secret_key
           DATABASE_URL: sqlite:///./test.db
         run: |
-          pytest -v
+          python -m pytest -v
 
       - name: Build Docker image
         run: |
