@@ -15,6 +15,7 @@ Backend API для управления задачами с аутентифик
 - Telegram уведомления
 - Frontend страницы (login / register / dashboard)
 - Swagger документация
+- CI через GitHub Actions
 
 ---
 
