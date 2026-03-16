@@ -29,8 +29,8 @@ jobs:
           SECRET_KEY: test_secret_key
           DATABASE_URL: sqlite:///./test.db
         run: |
-          pytest
-          
+          python -m pytest
+
       - name: Build Docker image
         run: |
-          docker build -t task-manager-api .
+          docker build -t task-manager .

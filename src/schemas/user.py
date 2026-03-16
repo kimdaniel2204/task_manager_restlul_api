@@ -10,5 +10,5 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
