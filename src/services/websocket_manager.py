@@ -1,3 +1,6 @@
+import json
+
+from src.utils.logger import logger
 from fastapi import WebSocket
 from typing import List
 
@@ -8,15 +11,20 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if websocket not in self.active_connections:
+            self.active_connections.append(websocket)
+            logger.info(f"Активных соединений: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, message: str):
-        # Отправка сообщения всем сразу
+    async def broadcast(self, message: dict):
+        json_message = json.dumps(message)
         for connection in self.active_connections:
-            await connection.send_text(message)
+            try:
+                await connection.send_text(json_message)
+            except Exception:
+                continue
 
 # Создаем один экземпляр на все приложение
 manager = ConnectionManager()

@@ -78,8 +78,19 @@
                 socket.onopen = () => console.log("WebSocket подключен");
                 
                 socket.onmessage = (event) => {
-                    console.log("Обновление через WS:", event.data);
-                    loadTasks(); 
+                    console.log("Сырые данные через WS:", event.data);
+                    
+                    try {
+                        const data = JSON.parse(event.data); 
+
+                        if (data.type === "deadline_update") {
+                            console.log("Сигнал дедлайна получен");
+                        }
+                        loadTasks(); 
+                        
+                    } catch (e) {
+                        console.error("Ошибка при чтении сообщения от сервера:", e);
+                    }
                 };
 
                 socket.onclose = () => {
@@ -110,19 +121,30 @@
                     tbody.innerHTML = '';
 
                     tasks.forEach(task => {
-                        // Форматируем дату дедлайна, если она есть
-                        const deadlineDate = task.deadline ? new Date(task.deadline).toLocaleString() : '-';
+                        const now = new Date();
+                        // Превращаем строку дедлайна в объект даты JS
+                        const taskDeadline = task.deadline ? new Date(task.deadline) : null;
                         
+                        // ПРОВЕРКА: Если задача не выполнена И дедлайн меньше текущего времени
+                        const isOverdue = taskDeadline && taskDeadline < now && task.status !== 'completed';
+                        
+                        // Определяем стиль строки (красный фон, если просрочено)
+                        const rowClass = isOverdue ? 'table-danger' : ''; 
+                        const deadlineText = task.deadline ? new Date(task.deadline).toLocaleString() : '-';
+
                         const row = `
-                            <tr>
+                            <tr class="${rowClass}">
                                 <td>${task.id}</td>
                                 <td>${task.title}</td>
                                 <td><span class="badge bg-secondary">${task.priority}</span></td>
                                 <td>
-                                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-warning'}">
+                                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-warning text-dark'}">
                                         ${task.status}
                                     </span>
-                                    <br><small class="text-muted">До: ${deadlineDate}</small>
+                                    <br>
+                                    <small class="${isOverdue ? 'text-danger fw-bold' : 'text-muted'}">
+                                        До: ${deadlineText} ${isOverdue ? ' ПРОСРОЧЕНО' : ''}
+                                    </small>
                                 </td>
                                 <td>
                                     <button onclick="completeTask(${task.id})" class="btn btn-sm btn-success">✅</button>
@@ -203,6 +225,7 @@
                 loadTasks();
             }
 
+            // 7. Выгрузка в CSV
             async function exportCSV() {
                 try {
                     const response = await fetch(`${API_URL}/tasks/export/csv`, {
@@ -227,7 +250,7 @@
                     document.body.appendChild(a);
                     a.click();
                     
-                    // Подметаем за собой
+                    // Очищаем ресурсы
                     window.URL.revokeObjectURL(url);
                     a.remove();
                     

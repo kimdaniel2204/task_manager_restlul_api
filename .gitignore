@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 venv/
 .env
+app.log
+task_db/
+*.db
 
 # Databases
 *.db

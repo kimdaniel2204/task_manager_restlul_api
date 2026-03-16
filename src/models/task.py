@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SqlEnum
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Enum as SqlEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -21,12 +21,20 @@ class TaskPriority(enum.Enum):
 # Основная модель задачи. Содержит все поля, необходимые для хранения инфо о задаче в базе данных
 class Task(Base):
     __tablename__ = "tasks"
+    
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    description = Column(String, nullable=True)
-    deadline = Column(DateTime, nullable=True)
-    status = Column(SqlEnum(TaskStatus), default=TaskStatus.new)
     priority = Column(SqlEnum(TaskPriority), default=TaskPriority.medium)
+    status = Column(SqlEnum(TaskStatus), default=TaskStatus.new)
+    description = Column(String, nullable=True)
+
+    # Дедлайн задачи. Может быть null, если дедлайн не установлен.
+    deadline = Column(DateTime, nullable=True)
+
+    # Поле для хранения информации о том, просрочена ли задача
+    is_overdue = Column(Boolean, default=False)
+    
+    # Время создания задачи
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Связь с пользователем-владельцем задачи. один ко многим

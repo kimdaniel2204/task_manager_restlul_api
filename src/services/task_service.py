@@ -1,10 +1,14 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from typing import Optional
 
+from src.services.telegram_service import TelegramService
 from src.models.task import Task, TaskPriority, TaskStatus
 from src.repositories.task_repository import TaskRepository
 from src.schemas.task import TaskCreate, TaskUpdate
+from src.utils.logger import logger
 
 import io
 import csv
@@ -73,3 +77,42 @@ class TaskService:
             ])
             
         return output.getvalue()
+    
+# Сервис для проверки дедлайнов задач
+class TaskDeadlineService:
+ 
+    def __init__(self, db: Session, telegram: TelegramService):
+        self.db = db
+        self.telegram = telegram
+
+    # Метод для проверки всех задач с установленным дедлайном. 
+    def check_overdue_tasks(self) -> bool:
+        now = datetime.now() 
+        tasks = (self.db.query(Task).filter(Task.deadline.isnot(None),Task.is_overdue.is_(False)).all())
+        
+        updated = False # Флаг для отслеживания, были ли найдены просроченные задачи
+
+        for task in tasks:
+            logger.info(f"Проверяю задачу {task.id}: дедлайн {task.deadline}, сейчас {now}")
+
+            if task.deadline < now:
+                logger.warning(f"Задача ID {task.id} просрочена! Отправка уведомления.")
+                task.is_overdue = True
+
+                self.telegram.send_notification(self._overdue_message(task))
+                updated = True
+        if updated:
+            self.db.commit() # Сохраняем изменения в БД только если были найдены просроченные задачи        
+            logger.info(f"Проверяю задачу {task.id}: дедлайн {task.deadline}, сейчас {now}")
+        return updated # Возвращаем результат проверки (были ли просроченные задачи)
+    
+
+    # Генерирует текст уведомления для просроченной задачи, включая ID, название и дедлайн.
+    @staticmethod
+    def _overdue_message(task: Task) -> str:
+        return (
+            " Задача просрочена!\n\n"
+            f" ID: `{task.id}`\n"
+            f" Название: {task.title}\n"
+            f" Дедлайн был: `{task.deadline}`"
+        )

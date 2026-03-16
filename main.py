@@ -1,22 +1,62 @@
+import asyncio
+
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.services.task_service import TaskDeadlineService
+from src.services.telegram_service import TelegramService
 from src.config import Settings
 from src.services.websocket_manager import manager
-from src.database import Base, engine
+from src.database import Base, SessionLocal, engine
 from src.models import user, task
 from src.api import auth, task
+from src.utils.logger import logger
 
 
-
-#Base.metadata.create_all(bind=engine)  закомментировал, т.к. миграции теперь через Alembic, 
-                                        #и эта строка может вызвать проблемы с синхронизацией схемы БД.
+Base.metadata.create_all(bind=engine)  
+# закомментировал, т.к. миграции теперь через Alembic, 
+#и эта строка может вызвать проблемы с синхронизацией схемы БД.
 
 app = FastAPI(title="Task Manager API")
 
+# Фоновая задача для проверки дедлайнов. 
+# Запускается при старте приложения и работает в бесконечном цикле, проверяя задачи каждую минуту.
+async def run_deadline_checker():
+    logger.info("Запуск проверки дедлайнов задач...")
+    while True:
+        try:
+            db = SessionLocal()
+            try:
+                tg_service = TelegramService() 
+                service = TaskDeadlineService(db, tg_service)            
+                found_overdue = service.check_overdue_tasks()
+                
+                if found_overdue:
+                    logger.info("Отправка сигнала обновления через WebSocket...")
+                    # Отправляем JSON всем подключенным клиентам
+                    await manager.broadcast({
+                        "type": "deadline_update",
+                        "message": "Обнаружены просроченные задачи"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при проверке задач: {e}", exc_info=True)
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.error(f"Ошибка подключения к БД в чекере: {e}")
+        await asyncio.sleep(60) # Проверяем задачи каждую минуту
+
+@app.on_event("startup")
+async def startup_event():
+    # Запускаем чекер в фоне, чтобы он не блокировал основной поток
+    asyncio.create_task(run_deadline_checker())
+    
+# Настройка CORS для разрешения запросов с фронтенда
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Разрешаем доступ всем
@@ -28,7 +68,7 @@ app.add_middleware(
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 # Обрабатывает стандартные HTTP ошибки (404, 401, 403 и т.д.)
-#     и возвращает их в едином JSON формате
+#  и возвращает их в едином JSON формате
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -42,15 +82,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 async def global_exception_handler(request: Request, exc: Exception):
     #    Глобальный обработчик ошибок.
     # Срабатывает, если ошибка не была обработана явно.
-    print(f"Глобальная ошибка: {str(exc)}")
+    logger.error(f"Глобальное исключение на {request.url.path}: {exc}", exc_info=True)
     
     return JSONResponse(
         status_code=500,
         content={
             "status": "critical_error",
             "message": "Что-то пошло совсем не так на стороне сервера",
-            # Если в .env DEBUG=True, покажет причину (удобно для разработки)
-            # Если DEBUG=False, юзер увидит только общее сообщение (безопасно для продакшена)
             "details": str(exc) if Settings.DEBUG else "Internal Server Error"
         },
     )
@@ -60,7 +98,6 @@ app.include_router(auth.router)
 
 # Роуты работы с задачами
 app.include_router(task.router)
-
 
 # Роуты для статических файлов и HTML страниц
 app.mount("/static", StaticFiles(directory="static"), name="static")

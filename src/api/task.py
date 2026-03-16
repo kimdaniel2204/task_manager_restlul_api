@@ -99,7 +99,7 @@ async def delete_task(
     # Выполняем удаление один раз
     result = task_service.delete_task(task_id, current_user.id)
     
-    msg = f"Задача удалена:\nID: {task_id}:\nНазвание: {result.get('message', 'Unknown')}"
+    msg = f"Задача удалена:\nID: {task_id}"
     background_tasks.add_task(tg_service.send_notification, msg)
     await manager.broadcast(f"Задача удалена: {task_id}")
 
