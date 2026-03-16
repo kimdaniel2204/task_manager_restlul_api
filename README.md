@@ -63,9 +63,11 @@ task_manager/
 
 
 
-1 Установка и запуск в ручную
 
-# 1 Клонировать репозиторий
+
+# 1 Установка и запуск в ручную
+
+1 Установка и запуск в ручную
 
 ```bash
 git clone https://github.com/kimdaniel2204/task-manager-restful-api.git
