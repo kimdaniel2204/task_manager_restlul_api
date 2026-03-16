@@ -80,7 +80,7 @@ async def update_task(
     task_service = TaskService(db)
     updated_task = task_service.update_task(task_id, current_user.id, update_data)
     
-    msg = f"Задача обновлена (ID: {task_id}):\nНовый статус: {updated_task.status.value}"
+    msg = f"Задача обновлена (ID: {task_id}):\nНовый статус: {updated_task.status.value}:\nНовое название: {updated_task.title}"
     background_tasks.add_task(tg_service.send_notification, msg)
     await manager.broadcast(f"Задача обновлена: {updated_task.title}")
 
@@ -99,7 +99,7 @@ async def delete_task(
     # Выполняем удаление один раз
     result = task_service.delete_task(task_id, current_user.id)
     
-    msg = f"Задача удалена:\nID: {task_id}"
+    msg = f"Задача удалена:\nID: {task_id}:\nНазвание: {result.get('message', 'Unknown')}"
     background_tasks.add_task(tg_service.send_notification, msg)
     await manager.broadcast(f"Задача удалена: {task_id}")
 

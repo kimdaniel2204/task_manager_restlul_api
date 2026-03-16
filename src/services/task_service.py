@@ -30,7 +30,7 @@ class TaskService:
         )
         return self.task_repo.create(task)
 
-# Метод для удаления задачи. Проверяет, что задача существует и принадлежит текущему пользователю, затем удаляет ее из базы данных.
+# Метод для удаления задачи. удаляет ее из базы данных.
     def delete_task(self, task_id: int, user_id: int):
         task = self.task_repo.get_by_id(task_id)
         if not task or task.owner_id != user_id:
@@ -41,7 +41,7 @@ class TaskService:
         self.task_repo.delete(task)
         return {"message": "Task deleted"}
     
-    # Метод для обновления задачи. Проверяет, что задача существует и принадлежит текущему пользователю, затем обновляет ее поля на основе переданных данных и сохраняет изменения в базе данных.
+    # Метод для обновления задачи. обновляет ее поля на основе переданных данных и сохраняет изменения в базе данных.
     def update_task(self, task_id: int, user_id: int, update_data: TaskUpdate):
         task = self.task_repo.get_by_id(task_id)
         if not task or task.owner_id != user_id:

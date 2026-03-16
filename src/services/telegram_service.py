@@ -9,7 +9,8 @@ class TelegramService:
         self.chat_id = settings.TELEGRAM_CHAT_ID
         self.api_url = f"https://api.telegram.org/bot{self.token}/sendMessage"
 
-# Метод для отправки уведомления. Принимает текст сообщения, формирует полезную нагрузку и отправляет POST запрос к Telegram API. Если токен или ID чата не настроены, выводит предупреждение в консоль. Также обрабатывает возможные исключения при отправке запроса и выводит ошибку в консоль.
+# Метод для отправки уведомления. Принимает текст сообщения, 
+# формирует полезную нагрузку и отправляет POST запрос к Telegram API.
     def send_notification(self, text: str):
         if not self.token or not self.chat_id:
             print("Telegram credentials not found")
