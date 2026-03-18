@@ -29,6 +29,8 @@ Backend API для управления задачами с аутентифик
 - Passlib (bcrypt)
 - Pytest
 - Bootstrap (frontend)
+- Docker, Docker-compose
+- GitHub Actions(CI/CD)
 
 ---
 
